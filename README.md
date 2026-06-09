@@ -19,7 +19,7 @@
 |---------|---------|
 | Java    | 21+     |
 | Maven   | 3.9+    |
-| MariaDB | 8.0+    |
+| MariaDB | 10+     |
 | Python3 | any     |
 
 Verify before starting:

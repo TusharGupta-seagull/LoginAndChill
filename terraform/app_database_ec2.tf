@@ -43,23 +43,23 @@ resource "aws_instance" "mysql" {
               export SCHEMA_CONTENT_B64="${var.mysql_schema_b64}"
               
               dnf update -y
-              dnf install -y mariadb-server awscli
+              dnf install -y mariadb118-server awscli
               
-              systemctl enable mariadb.service
-              systemctl start mariadb.service
+              systemctl enable mariadb
+              systemctl start mariadb
               
               #retry up to 30 times
               for i in {1..30}; do
-                mysql -u root -e "SELECT 1" > /dev/null 2>&1 && break
-                echo "Waiting for MySQL... attempt $i/30"
+                mariadb -u root -e "SELECT 1" > /dev/null 2>&1 && break
+                echo "Waiting for MariaDB... attempt $i/30"
                 sleep 2
               done
               
-              mysql -u root <<SQL
+              mariadb -u root <<SQL
                 CREATE DATABASE IF NOT EXISTS loginapp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
               SQL
               
-              mysql -u root <<SQL
+              mariadb -u root <<SQL
                 CREATE USER IF NOT EXISTS 'loginapp_user'@'%' IDENTIFIED BY '${random_password.db_password.result}';
                 GRANT ALL PRIVILEGES ON loginapp.* TO 'loginapp_user'@'%';
                 FLUSH PRIVILEGES;
@@ -70,7 +70,7 @@ resource "aws_instance" "mysql" {
                 echo "$SCHEMA_CONTENT_B64" | base64 -d > /tmp/schema.sql
                 
                 if [ -s /tmp/schema.sql ]; then
-                  mysql -u root loginapp < /tmp/schema.sql
+                  mariadb -u root loginapp < /tmp/schema.sql
                   echo "Schema applied from Jenkins at $(date)" | tee -a /var/log/user-data.log
                 else
                   echo "Schema from Jenkins was empty, skipping" | tee -a /var/log/user-data.log
@@ -82,7 +82,7 @@ resource "aws_instance" "mysql" {
                 echo "No schema provided (SCHEMA_CONTENT_B64 empty), skipping schema apply" | tee -a /var/log/user-data.log
               fi
               
-              echo "MySQL setup completed at $(date)" | tee -a /var/log/user-data.log
+              echo "MariaDB setup completed at $(date)" | tee -a /var/log/user-data.log
               EOF
 
   tags = {
