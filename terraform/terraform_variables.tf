@@ -10,3 +10,10 @@ variable "project_name" {
 variable "environment" {
   description = "Environment"
 }
+
+variable "mysql_schema_b64" {
+  description = "Base64-encoded SQL schema content. Empty = skip schema apply."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

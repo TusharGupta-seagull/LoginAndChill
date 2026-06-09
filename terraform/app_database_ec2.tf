@@ -9,7 +9,6 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-
 # MySQL EC2 Instance
 resource "aws_instance" "mysql" {
   ami                    = data.aws_ami.amazon_linux.id
@@ -18,7 +17,6 @@ resource "aws_instance" "mysql" {
   vpc_security_group_ids = [module.mysql_sg.security_group_id]
 
   iam_instance_profile = aws_iam_instance_profile.mysql.name
-
   associate_public_ip_address = false
 
   root_block_device {
@@ -32,25 +30,24 @@ resource "aws_instance" "mysql" {
               exec > /var/log/user-data.log 2>&1
               set -ex
               
+              export SCHEMA_CONTENT_B64="${var.mysql_schema_b64}"
+              
               yum update -y
               yum install -y mariadb-server awscli
               
               systemctl enable mariadb
               systemctl start mariadb
-
-              if [ -n "$SCHEMA_CONTENT_B64" ]; then
-                echo "$SCHEMA_CONTENT_B64" | base64 -d > /tmp/schema.sql
-              elif [ -f /tmp/schema.sql ]; then
-                # Fallback: if Jenkins didn't provide it, try local file (for manual testing)
-                echo "Using local schema.sql"
-              fi
-
-              if [ -f /tmp/schema.sql ] && [ -s /tmp/schema.sql ]; then
-                mysql -u root loginapp < /tmp/schema.sql
-                echo "Schema applied successfully at $(date)" | tee -a /var/log/user-data.log
-              else
-                echo "Warning: No schema found, skipping migration" | tee -a /var/log/user-data.log
-              fi
+              
+              #retry up to 30 times
+              for i in {1..30}; do
+                mysql -u root -e "SELECT 1" > /dev/null 2>&1 && break
+                echo "Waiting for MySQL... attempt $i/30"
+                sleep 2
+              done
+              
+              mysql -u root <<SQL
+                CREATE DATABASE IF NOT EXISTS loginapp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+              SQL
               
               mysql -u root <<SQL
                 CREATE USER IF NOT EXISTS 'loginapp_user'@'%' IDENTIFIED BY '${random_password.db_password.result}';
@@ -58,13 +55,21 @@ resource "aws_instance" "mysql" {
                 FLUSH PRIVILEGES;
               SQL
               
-              aws s3 cp s3://${aws_s3_bucket.frontend.bucket}/schema.sql /tmp/schema.sql
-              
-              if [ -f /tmp/schema.sql ]; then
-                mysql -u root loginapp < /tmp/schema.sql
-                echo "Schema applied successfully at $(date)" | tee -a /var/log/user-data.log
+              if [ -n "$SCHEMA_CONTENT_B64" ] && [ "$SCHEMA_CONTENT_B64" != "null" ]; then
+                echo "Apply schema from Jenkins secret at $(date)" | tee -a /var/log/user-data.log
+                echo "$SCHEMA_CONTENT_B64" | base64 -d > /tmp/schema.sql
+                
+                if [ -s /tmp/schema.sql ]; then
+                  mysql -u root loginapp < /tmp/schema.sql
+                  echo "Schema applied from Jenkins at $(date)" | tee -a /var/log/user-data.log
+                else
+                  echo "Schema from Jenkins was empty, skipping" | tee -a /var/log/user-data.log
+                fi
+                
+                # Delete schema file
+                shred -u /tmp/schema.sql 2>/dev/null || rm -f /tmp/schema.sql
               else
-                echo "Failed to download schema.sql" | tee -a /var/log/user-data.log
+                echo "No schema provided (SCHEMA_CONTENT_B64 empty), skipping schema apply" | tee -a /var/log/user-data.log
               fi
               
               echo "MySQL setup completed at $(date)" | tee -a /var/log/user-data.log

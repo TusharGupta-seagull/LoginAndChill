@@ -35,6 +35,14 @@ module "ecs_cluster" {
   }
 }
 
+resource "aws_cloudwatch_log_group" "backend" {
+  name              = "/ecs/backend"
+  retention_in_days = 30
+  tags = {
+    Project     = var.project_name
+    Environment = var.environment
+  }
+}
 
 # Backend ECS Service
 resource "aws_ecs_task_definition" "backend" {

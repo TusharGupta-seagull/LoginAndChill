@@ -1,6 +1,7 @@
 
 resource "aws_secretsmanager_secret" "app_secrets" {
   name = "${var.project_name}-${var.environment}-app-secrets"
+  recovery_window_in_days = 0
 
   description = "Runtime secrets for LoginApp backend"
 
