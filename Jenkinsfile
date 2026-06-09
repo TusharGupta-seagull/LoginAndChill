@@ -75,7 +75,7 @@ pipeline {
                 sh """
                     aws ecs update-service \\
                         --cluster ${env.PROJECT_NAME}-${env.ENVIRONMENT}-cluster \\
-                        --service ${env.PROJECT_NAME}-${env.ENVIRONMENT}-backend-service \\
+                        --service ${env.PROJECT_NAME}-backend-service \\
                         --force-new-deployment \\
                         --region ${env.AWS_REGION}
                 """
