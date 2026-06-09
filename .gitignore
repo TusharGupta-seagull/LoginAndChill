@@ -1,0 +1,46 @@
+# Java
+target/
+*.class
+*.jar
+*.war
+*.log
+
+# Maven
+.mvn/
+!/.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env / Secrets
+.env
+*.env
+application-local.properties
+
+# Keys
+*.pem
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/*.tfplan
+terraform/crash.log
+!terraform/terraform.tfvars.example
+terraform/.terraform.lock.hcl
+
+terraform/*.txt
+
+
+#Database
+database/*.sql
