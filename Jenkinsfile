@@ -14,12 +14,20 @@ pipeline {
         APP_DIR       = 'backend'
     }
 
+    parameters {
+        choice(
+            name: 'ACTION',
+            choices: ['apply', 'destroy'],
+            description: 'apply = deploy infrastructure | destroy = tear down everything'
+        )
+    }
+
     stages {
         stage('1. Load Schema Secret') {
+            when { expression { params.ACTION == 'apply' } }
             steps {
                 checkout scm
                 script {
-                    // Read schema.sql & encode to base64
                     withCredentials([string(credentialsId: 'loginapp-schema-sql', variable: 'SCHEMA_RAW')]) {
                         env.SCHEMA_B64 = sh(script: 'echo -n "$SCHEMA_RAW" | base64 -w0', returnStdout: true).trim()
                     }
@@ -27,21 +35,28 @@ pipeline {
             }
         }
 
-        stage('2. Terraform Apply') {
+        stage('2. Terraform') {
             steps {
                 dir(env.TF_DIR) {
                     sh 'terraform init -input=false'
-                    sh "terraform plan -var-file=terraform.tfvars -var='mysql_schema_b64=${env.SCHEMA_B64}' -out=tfplan"
-                    sh 'terraform apply -auto-approve tfplan'
-                    // Capture ALB DNS for the health check
+                    
                     script {
-                        env.ALB_DNS = sh(script: 'terraform output -raw alb_dns_name', returnStdout: true).trim()
+                        if (params.ACTION == 'destroy') {
+                            sh 'terraform destroy -var-file=terraform.tfvars -auto-approve'
+                            echo "Infrastructure destroyed successfully"
+                        } else {
+                            sh "terraform plan -var-file=terraform.tfvars -var='mysql_schema_b64=${env.SCHEMA_B64}' -out=tfplan"
+                            sh 'terraform apply -auto-approve tfplan'
+                            
+                            env.ALB_DNS = sh(script: 'terraform output -raw alb_dns_name', returnStdout: true).trim()
+                        }
                     }
                 }
             }
         }
 
         stage('3. Build App') {
+            when { expression { params.ACTION == 'apply' } }  
             steps {
                 dir(env.APP_DIR) {
                     sh 'mvn clean package -DskipTests'
@@ -50,6 +65,7 @@ pipeline {
         }
 
         stage('4. Build & Push Docker Image') {
+            when { expression { params.ACTION == 'apply' } }
             steps {
                 dir(env.APP_DIR) {
                     script {
@@ -57,10 +73,8 @@ pipeline {
                         def ecrRepoUrl = "${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com/${env.PROJECT_NAME}-backend"
                         def imageTag = "build-${env.BUILD_ID}"
 
-                        // ECR Login (uses Jenkins EC2 IAM role automatically)
                         sh "aws ecr get-login-password --region ${env.AWS_REGION} | docker login --username AWS --password-stdin ${accountId}.dkr.ecr.${env.AWS_REGION}.amazonaws.com"
 
-                        // Build & Push
                         sh "docker build -t ${env.PROJECT_NAME}-backend:${imageTag} ."
                         sh "docker tag ${env.PROJECT_NAME}-backend:${imageTag} ${ecrRepoUrl}:${imageTag}"
                         sh "docker tag ${env.PROJECT_NAME}-backend:${imageTag} ${ecrRepoUrl}:latest"
@@ -69,8 +83,9 @@ pipeline {
                 }
             }
         }
-        
+
         stage('5. Deploy to ECS') {
+            when { expression { params.ACTION == 'apply' } } 
             steps {
                 sh """
                     aws ecs update-service \\
@@ -83,9 +98,10 @@ pipeline {
         }
 
         stage('6. Health Check') {
+            when { expression { params.ACTION == 'apply' } }  
             steps {
                 script {
-                    sleep 60 // Wait for ECS to pull image & start containers
+                    sleep 60
                     sh "curl -f --max-time 10 http://${env.ALB_DNS}/api/auth/health || exit 1"
                     echo "Health check passed!"
                 }
@@ -95,7 +111,7 @@ pipeline {
 
     post {
         always {
-            echo "🏁 Pipeline finished. Status: ${currentBuild.result}"
+            echo "🏁 Pipeline finished. Action: ${params.ACTION} | Status: ${currentBuild.result}"
         }
     }
 }
