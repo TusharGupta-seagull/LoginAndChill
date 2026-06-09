@@ -14,6 +14,7 @@ resource "aws_instance" "mysql" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = "t3.micro"
   subnet_id              = module.vpc.private_subnets[0]
+  key_name = "loginapp-dev-key"
   vpc_security_group_ids = [module.mysql_sg.security_group_id]
 
   iam_instance_profile = aws_iam_instance_profile.mysql.name

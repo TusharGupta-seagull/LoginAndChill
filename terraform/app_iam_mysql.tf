@@ -32,6 +32,11 @@ resource "aws_iam_role_policy" "mysql_s3" {
   })
 }
 
+resource "aws_iam_role_policy_attachment" "mysql_ssm" {
+  role       = aws_iam_role.mysql.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
 resource "aws_iam_instance_profile" "mysql" {
   name = "${var.project_name}-${var.environment}-mysql-profile"
   role = aws_iam_role.mysql.name
