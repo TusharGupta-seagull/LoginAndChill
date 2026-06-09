@@ -5,7 +5,16 @@ data "aws_ami" "amazon_linux" {
 
   filter {
     name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+    values = ["al2023-ami-2023*-x86_64"]
+  }
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
+  }
+
+  filter {
+    name   = "state"
+    values = ["available"]
   }
 }
 
@@ -33,11 +42,11 @@ resource "aws_instance" "mysql" {
               
               export SCHEMA_CONTENT_B64="${var.mysql_schema_b64}"
               
-              yum update -y
-              yum install -y mariadb-server awscli
+              dnf update -y
+              dnf install -y mariadb-server awscli
               
-              systemctl enable mariadb
-              systemctl start mariadb
+              systemctl enable mariadb.service
+              systemctl start mariadb.service
               
               #retry up to 30 times
               for i in {1..30}; do
