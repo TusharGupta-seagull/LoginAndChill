@@ -82,7 +82,7 @@ resource "aws_instance" "mysql" {
     Environment = var.environment
   }
 
-  depends_on = [aws_iam_instance_profile.mysql]
+  depends_on = [module.vpc.natgw_ids, aws_iam_instance_profile.mysql]
 }
 
 # Password for MySQL User
