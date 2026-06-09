@@ -69,7 +69,7 @@ pipeline {
                 }
             }
         }
-
+        
         stage('5. Deploy to ECS') {
             steps {
                 sh """
