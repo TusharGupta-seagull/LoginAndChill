@@ -25,6 +25,7 @@ resource "aws_instance" "mysql" {
   subnet_id              = module.vpc.private_subnets[0]
   key_name = "loginapp-dev-key"
   vpc_security_group_ids = [module.mysql_sg.security_group_id]
+  user_data_replace_on_change = true
 
   iam_instance_profile = aws_iam_instance_profile.mysql.name
   associate_public_ip_address = false
@@ -36,7 +37,7 @@ resource "aws_instance" "mysql" {
   }
 
   user_data = <<-EOF
-              #!/bin/bash
+              #!/usr/bin/env bash
               exec > /var/log/user-data.log 2>&1
               set -ex
               
